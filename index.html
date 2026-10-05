@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulation de montages à amplificateur opérationnel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+:root{--bg:#f5f7fa;--panel:#fff;--ink:#16202e;--mut:#5d6b7e;--grid:#dde3ec;--line:#c9d2df;--e1:#2f55d4;--e2:#128a7d;--vs:#d6336c;--bad:#c92a2a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151d;--panel:#18202c;--ink:#e8edf5;--mut:#93a1b5;--grid:#2a3444;--line:#3a4658;--e1:#7d98ff;--e2:#45d1bf;--vs:#ff7fa9;--bad:#ff8787}}
+:root[data-theme="dark"]{--bg:#10151d;--panel:#18202c;--ink:#e8edf5;--mut:#93a1b5;--grid:#2a3444;--line:#3a4658;--e1:#7d98ff;--e2:#45d1bf;--vs:#ff7fa9;--bad:#ff8787}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:4px 0 12px}
+.top{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px 18px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;align-items:end}
+.top label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--mut)}
+.top b{color:var(--ink);font-weight:600}
+input[type=range],select{width:100%}
+select{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 10px;border-radius:8px;font:inherit}
+:focus-visible{outline:2px solid var(--vs);outline-offset:2px}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:12px}
+.read div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:.82rem;color:var(--mut)}
+.read strong{display:block;font-size:1.05rem;color:var(--ink)}
+.grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:12px;margin-bottom:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+.card h2{font-size:.95rem;margin:2px 6px 4px;color:var(--mut);font-weight:600}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:.85rem;margin:0 6px 4px}
+.leg i{display:inline-block;width:12px;height:3px;margin-right:5px;vertical-align:middle}
+canvas{display:block;width:100%}
+#sch,#xy{aspect-ratio:480/290}
+#sc{height:340px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>Montages à amplificateur opérationnel</h1>
+<div class="top" id="ctl">
+  <div><label>Montage</label><select id="mode"></select></div>
+  <div><label>Forme du signal e1</label><select id="wave"><option value="sin">Sinus</option><option value="tri">Triangle</option><option value="sq">Carré</option></select></div>
+</div>
+
+<div class="read">
+  <div>Relation entrée-sortie<strong id="r_rel"></strong></div>
+  <div>Caractéristique<strong id="r_gain"></strong></div>
+  <div>Gain mesuré (crête à crête)<strong id="r_meas"></strong></div>
+  <div>Tension de saturation ±Vsat<strong id="r_sat"></strong></div>
+  <div>État de la sortie<strong id="r_state"></strong></div>
+</div>
+
+<div class="grid">
+  <div class="card"><h2>Schéma du montage</h2><canvas id="sch"></canvas></div>
+  <div class="card"><h2>Caractéristique de transfert vs = f(e1)</h2><canvas id="xy"></canvas></div>
+</div>
+<div class="card"><h2>Oscilloscope : entrées et sortie (trois périodes de e1)</h2>
+  <div class="leg"><span><i style="background:var(--e1)"></i>e1</span><span id="l2"><i style="background:var(--e2)"></i>e2</span><span><i style="background:var(--vs)"></i>vs</span></div>
+  <canvas id="sc"></canvas></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const FONT = '"IBM Plex Sans",sans-serif';
+const M = {
+  inv:  {n:'Amplificateur inverseur', s:['R1','R2']},
+  non:  {n:'Amplificateur non inverseur', s:['R1','R2']},
+  suiv: {n:'Suiveur', s:[]},
+  som:  {n:'Sommateur inverseur', s:['R1','R2','R3'], two:1},
+  diff: {n:'Amplificateur différentiel', s:['R1','R2'], two:1},
+  integ:{n:'Intégrateur', s:['R1','C']},
+  deriv:{n:'Dérivateur', s:['R2','C']},
+  comp: {n:'Comparateur (seuil Vref)', s:['Vref']},
+  schm: {n:'Trigger de Schmitt inverseur', s:['R1','R2']}
+};
+const P = [
+  {id:'R1',l:'R1',t:'log',min:100,max:1e6,v:1e4,u:'Ω'},
+  {id:'R2',l:'R2',t:'log',min:100,max:1e6,v:2.2e4,u:'Ω'},
+  {id:'R3',l:'R3',t:'log',min:100,max:1e6,v:1e4,u:'Ω'},
+  {id:'C',l:'C',t:'log',min:1e-9,max:1e-5,v:1e-7,u:'F'},
+  {id:'Vref',l:'Vref',t:'lin',min:-5,max:5,step:0.1,v:0,u:'V'},
+  {id:'vcc',l:'Alimentation ±Vcc',t:'lin',min:5,max:18,step:1,v:15,u:'V'},
+  {id:'f',l:'Fréquence de e1',t:'log',min:10,max:1e4,v:200,u:'Hz'},
+  {id:'A1',l:'Amplitude de e1',t:'lin',min:0,max:10,step:0.1,v:1,u:'V'},
+  {id:'off',l:'Composante continue de e1',t:'lin',min:-5,max:5,step:0.1,v:0,u:'V'},
+  {id:'f2',l:'Fréquence de e2',t:'log',min:10,max:1e4,v:1000,u:'Hz'},
+  {id:'A2',l:'Amplitude de e2',t:'lin',min:0,max:10,step:0.1,v:0.5,u:'V'}
+];
+const S = {mode:'inv', wave:'sin'};
+function fmt(x,u){
+  const a = Math.abs(x), p = [[1e6,'M'],[1e3,'k'],[1,''],[1e-3,'m'],[1e-6,'µ'],[1e-9,'n']];
+  if(a===0) return '0 '+u;
+  for(const [k,s] of p) if(a >= k*0.9999) return (x/k).toPrecision(3).replace(/\.?0+$/,'')+' '+s+u;
+  return x.toPrecision(3)+' '+u;
+}
+const nice = x => { const p = Math.pow(10, Math.floor(Math.log10(x))), m = x/p; return (m<=1?1:m<=2?2:m<=5?5:10)*p; };
+
+/* ---------- Interface générée ---------- */
+Object.entries(M).forEach(([k,m]) => { const o = document.createElement('option'); o.value = k; o.textContent = m.n; $('mode').appendChild(o); });
+P.forEach(c => {
+  S[c.id] = c.v;
+  const d = document.createElement('div'); d.id = 'g_'+c.id;
+  d.innerHTML = '<label>'+c.l+' <b id="o_'+c.id+'"></b></label><input id="s_'+c.id+'" type="range" '+
+    (c.t==='log' ? 'min="0" max="1000" value="'+Math.round(1000*Math.log(c.v/c.min)/Math.log(c.max/c.min))+'"' :
+                   'min="'+c.min+'" max="'+c.max+'" step="'+c.step+'" value="'+c.v+'"')+'>';
+  $('ctl').appendChild(d);
+  $('s_'+c.id).oninput = e => { S[c.id] = c.t==='log' ? c.min*Math.pow(c.max/c.min, +e.target.value/1000) : +e.target.value; run(); };
+});
+$('mode').onchange = e => { S.mode = e.target.value; run(); };
+$('wave').onchange = e => { S.wave = e.target.value; run(); };
+
+/* ---------- Simulation temporelle (AOP idéal avec saturation) ---------- */
+const shape = {sin:p=>Math.sin(p), tri:p=>2/Math.PI*Math.asin(Math.sin(p)), sq:p=>Math.sin(p)>=0?1:-1};
+const E1 = t => S.off + S.A1*shape[S.wave](2*Math.PI*S.f*t);
+const E2 = t => S.A2*Math.sin(2*Math.PI*S.f2*t);
+let R = {};
+function sim(){
+  const N = 1500, T = 3/S.f, dt = T/N, vsat = S.vcc-1.5, clamp = x => Math.max(-vsat, Math.min(vsat, x));
+  const t = [], e1 = [], e2 = [], vs = []; let y = 0, hy = vsat, sat = false;
+  for(let i=0;i<=N;i++){
+    const tt = i*dt, a = E1(tt), b = E2(tt); let o = 0;
+    switch(S.mode){
+      case 'inv':  o = -S.R2/S.R1*a; break;
+      case 'non':  o = (1+S.R2/S.R1)*a; break;
+      case 'suiv': o = a; break;
+      case 'som':  o = -S.R2*(a/S.R1 + b/S.R3); break;
+      case 'diff': o = S.R2/S.R1*(b-a); break;
+      case 'integ': y = clamp(y - a/(S.R1*S.C)*dt); o = y; break;
+      case 'deriv': o = -S.R2*S.C*(a-E1(tt-dt))/dt; break;
+      case 'comp': o = a > S.Vref ? vsat : -vsat; break;
+      case 'schm': { const th = vsat*S.R1/(S.R1+S.R2);
+        if(hy>0 && a>th) hy = -vsat; else if(hy<0 && a<-th) hy = vsat; o = hy; break; }
+    }
+    if(Math.abs(o) > vsat) sat = true;
+    t.push(tt); e1.push(a); e2.push(b); vs.push(clamp(o));
+  }
+  R = {t, e1, e2, vs, T, vsat, sat};
+}
+
+function infos(){
+  const m = S.mode, q = S.R2/S.R1, vsat = R.vsat;
+  const txt = {
+    inv:['vs = −(R2/R1)·e1', 'G = '+(-q).toPrecision(3)],
+    non:['vs = (1 + R2/R1)·e1', 'G = '+(1+q).toPrecision(3)],
+    suiv:['vs = e1', 'G = 1 (Zin élevée, Zout faible)'],
+    som:['vs = −R2·(e1/R1 + e2/R3)', 'G1 = '+(-S.R2/S.R1).toPrecision(3)+' ; G2 = '+(-S.R2/S.R3).toPrecision(3)],
+    diff:['vs = (R2/R1)·(e2 − e1)', 'G = '+q.toPrecision(3)],
+    integ:['vs = −(1/R1C)·∫e1 dt', 'τ = R1·C = '+fmt(S.R1*S.C,'s')],
+    deriv:['vs = −R2·C·de1/dt', 'τ = R2·C = '+fmt(S.R2*S.C,'s')],
+    comp:['e1 > Vref → +Vsat, sinon −Vsat', 'seuil = '+fmt(S.Vref,'V')],
+    schm:['Basculement à ±Vsat·R1/(R1+R2)', 'seuils = ±'+fmt(vsat*S.R1/(S.R1+S.R2),'V')]
+  }[m];
+  $('r_rel').textContent = txt[0]; $('r_gain').textContent = txt[1];
+  let meas = '—';
+  if(['inv','non','suiv'].includes(m) && !R.sat){
+    const pp = a => Math.max(...a)-Math.min(...a); if(pp(R.e1) > 1e-9) meas = (pp(R.vs)/pp(R.e1)*(m==='inv'?-1:1)).toPrecision(3);
+  }
+  $('r_meas').textContent = meas;
+  $('r_sat').textContent = '±'+fmt(vsat,'V');
+  const st = $('r_state'); st.textContent = R.sat ? 'Saturation' : 'Régime linéaire';
+  st.style.color = R.sat ? css('--bad') : css('--ink');
+}
+
+/* ---------- Canvas ---------- */
+const cv = {};
+function fit(id){
+  const c = $(id), r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  c.width = r.width*d; c.height = r.height*d;
+  const g = c.getContext('2d'); g.setTransform(d,0,0,d,0,0); cv[id] = {g, w:r.width, h:r.height};
+}
+const fitAll = () => { ['sch','xy','sc'].forEach(fit); draw(); };
+addEventListener('resize', fitAll);
+
+function drawScope(){
+  const {g,w,h} = cv.sc, grid = css('--grid'), mut = css('--mut');
+  g.clearRect(0,0,w,h);
+  const L = 56, Rm = 12, T = 12, B = 28, pw = w-L-Rm, ph = h-T-B;
+  const mx = Math.max(0.1, ...R.e1.map(Math.abs), ...R.vs.map(Math.abs), ...(M[S.mode].two ? R.e2.map(Math.abs) : [0]));
+  const ya = nice(mx*1.1), X = t => L + t/R.T*pw, Y = v => T + (1 - (v+ya)/(2*ya))*ph;
+  g.font = '12px '+FONT; g.lineWidth = 1; g.textAlign = 'right';
+  [-1,-0.5,0,0.5,1].forEach(a => { g.strokeStyle = grid; g.beginPath(); g.moveTo(L,Y(a*ya)); g.lineTo(L+pw,Y(a*ya)); g.stroke(); g.fillStyle = mut; g.fillText(fmt(a*ya,'V'), L-6, Y(a*ya)+4); });
+  g.textAlign = 'center';
+  for(let k=0;k<=3;k++){ g.strokeStyle = grid; g.beginPath(); g.moveTo(X(k*R.T/3),T); g.lineTo(X(k*R.T/3),T+ph); g.stroke(); g.fillStyle = mut; g.fillText(fmt(k*R.T/3,'s'), X(k*R.T/3), h-8); }
+  g.setLineDash([5,4]); g.strokeStyle = css('--bad'); g.globalAlpha = 0.6;
+  if(R.vsat < ya) [R.vsat,-R.vsat].forEach(v => { g.beginPath(); g.moveTo(L,Y(v)); g.lineTo(L+pw,Y(v)); g.stroke(); });
+  g.setLineDash([]); g.globalAlpha = 1;
+  const trace = (a,c,lw) => { g.strokeStyle = c; g.lineWidth = lw; g.beginPath(); a.forEach((v,i)=> i?g.lineTo(X(R.t[i]),Y(v)):g.moveTo(X(R.t[i]),Y(v))); g.stroke(); };
+  trace(R.e1, css('--e1'), 2);
+  if(M[S.mode].two) trace(R.e2, css('--e2'), 2);
+  trace(R.vs, css('--vs'), 2.6);
+}
+
+function drawXY(){
+  const {g,w,h} = cv.xy, grid = css('--grid'), mut = css('--mut');
+  g.clearRect(0,0,w,h);
+  const s = Math.min(w,h)-40, x0 = (w-s)/2, y0 = 14;
+  const mx = Math.max(0.1, ...R.e1.map(Math.abs), ...R.vs.map(Math.abs)), ya = nice(mx*1.1);
+  const X = v => x0 + (v+ya)/(2*ya)*s, Y = v => y0 + (1-(v+ya)/(2*ya))*s;
+  g.lineWidth = 1; g.strokeStyle = grid; g.strokeRect(x0,y0,s,s);
+  g.beginPath(); g.moveTo(X(0),y0); g.lineTo(X(0),y0+s); g.moveTo(x0,Y(0)); g.lineTo(x0+s,Y(0)); g.stroke();
+  g.fillStyle = mut; g.font = '12px '+FONT; g.textAlign = 'center';
+  g.fillText('e1 : ±'+fmt(ya,'V'), w/2, y0+s+16); g.textAlign = 'left'; g.fillText('vs', x0+4, y0+12);
+  g.strokeStyle = css('--vs'); g.lineWidth = 2; g.beginPath();
+  R.e1.forEach((a,i) => i ? g.lineTo(X(a),Y(R.vs[i])) : g.moveTo(X(a),Y(R.vs[i]))); g.stroke();
+}
+
+function drawSchem(){
+  const {g,w,h} = cv.sch, ink = css('--ink'), mut = css('--mut'), cE1 = css('--e1'), cE2 = css('--e2'), cVs = css('--vs');
+  g.clearRect(0,0,w,h); g.save(); g.scale(w/480, w/480);
+  g.strokeStyle = g.fillStyle = ink; g.lineWidth = 2; g.font = '600 12px '+FONT; g.lineJoin = 'round';
+  const ln = (...p) => { g.beginPath(); g.moveTo(p[0],p[1]); for(let i=2;i<p.length;i+=2) g.lineTo(p[i],p[i+1]); g.stroke(); };
+  const dot = (x,y) => { g.beginPath(); g.arc(x,y,3,0,7); g.fill(); };
+  const gnd = (x,y) => { ln(x,y,x,y+6); ln(x-10,y+6,x+10,y+6); ln(x-6,y+10,x+6,y+10); ln(x-2,y+14,x+2,y+14); };
+  const lab = (t,x,y,al,c) => { g.fillStyle = c||ink; g.textAlign = al||'center'; g.fillText(t,x,y); g.fillStyle = ink; };
+  const val = k => k==='C' ? fmt(S.C,'F') : fmt(S[k],'Ω');
+  const comp = (x1,y1,x2,y2,k,name,cap) => {
+    const hz = y1===y2, cx = (x1+x2)/2, cy = (y1+y2)/2, hl = 17;
+    if(cap){ if(hz){ ln(x1,y1,cx-4,y1); ln(cx+4,y1,x2,y2); ln(cx-4,cy-12,cx-4,cy+12); ln(cx+4,cy-12,cx+4,cy+12); } }
+    else if(hz){ ln(x1,y1,cx-hl,y1); ln(cx+hl,y1,x2,y2); g.strokeRect(cx-hl,cy-6,2*hl,12); }
+    else { ln(x1,y1,x1,cy-hl); ln(x1,cy+hl,x2,y2); g.strokeRect(x1-6,cy-hl,12,2*hl); }
+    if(hz) lab((name||k)+' '+val(k), cx, cy-(cap?18:12)); else lab((name||k)+' '+val(k), x1+12, cy+4, 'left');
+  };
+  const src = (x,y,t,c) => { g.strokeStyle = c; g.beginPath(); g.arc(x,y,13,0,7); g.stroke(); g.strokeStyle = ink;
+    lab('~',x,y+4,'center',c); lab(t,x,y-20,'center',c); };
+  const fb = (k,cap) => { ln(390,140,390,45,310,45); comp(310,45,230,45,k,k,cap); ln(230,45,210,45,210,100); dot(210,100); dot(390,140); };
+  // amplificateur
+  g.beginPath(); g.moveTo(250,78); g.lineTo(250,202); g.lineTo(350,140); g.closePath(); g.stroke();
+  lab('−',262,105,'left'); lab('+',262,188,'left');
+  ln(350,140,430,140); lab('vs',452,144,'center',cVs);
+  ln(210,100,250,100);
+  const m = S.mode;
+  if(m==='inv' || m==='integ' || m==='deriv'){
+    src(40,100,'e1',cE1); ln(53,100,80,100);
+    if(m==='deriv') comp(80,100,160,100,'C','C',1); else comp(80,100,160,100,'R1');
+    ln(160,100,250,100); ln(250,180,215,180); gnd(215,180);
+    if(m==='integ') fb('C',1); else fb('R2');
+  } else if(m==='non'){
+    src(40,180,'e1',cE1); ln(53,180,250,180); comp(210,100,210,140,'R1'); gnd(210,140); fb('R2');
+  } else if(m==='suiv'){
+    src(40,180,'e1',cE1); ln(53,180,250,180); ln(250,100,210,100,210,45,390,45,390,140); dot(210,100); dot(390,140);
+  } else if(m==='som'){
+    src(40,100,'e1',cE1); ln(53,100,80,100); comp(80,100,140,100,'R1');
+    src(40,180,'e2',cE2); ln(53,180,70,180); comp(70,180,130,180,'R3'); ln(130,180,160,180,160,100); dot(160,100);
+    ln(250,180,215,180); gnd(215,180); fb('R2');
+  } else if(m==='diff'){
+    src(40,100,'e1',cE1); ln(53,100,80,100); comp(80,100,140,100,'R1'); 
+    src(40,180,'e2',cE2); ln(53,180,80,180); comp(80,180,140,180,'R1','R1'); ln(140,180,250,180);
+    comp(190,180,190,222,'R2'); gnd(190,222); dot(190,180); fb('R2');
+  } else if(m==='comp'){
+    src(40,180,'e1',cE1); ln(53,180,250,180); src(40,100,'Vref',mut); ln(53,100,250,100);
+    lab(fmt(S.Vref,'V'),150,92);
+  } else if(m==='schm'){
+    src(40,100,'e1',cE1); ln(53,100,210,100); ln(210,100,250,100);
+    ln(250,180,150,180); comp(190,180,190,222,'R1'); gnd(190,222); dot(190,180);
+    ln(390,140,390,262,310,262); comp(310,262,230,262,'R2'); ln(230,262,150,262,150,180); dot(390,140);
+  }
+  g.restore();
+}
+
+function draw(){ drawSchem(); drawXY(); drawScope(); }
+
+/* ---------- Mise à jour ---------- */
+function run(){
+  P.forEach(c => {
+    const vis = ['f','A1','off','vcc'].includes(c.id) || M[S.mode].s.includes(c.id) || (M[S.mode].two && ['f2','A2'].includes(c.id));
+    $('g_'+c.id).hidden = !vis;
+    $('o_'+c.id).textContent = fmt(S[c.id], c.u);
+  });
+  $('l2').style.display = M[S.mode].two ? '' : 'none';
+  sim(); infos(); draw();
+}
+run(); fitAll();
+</script>
+</body>
+</html>
