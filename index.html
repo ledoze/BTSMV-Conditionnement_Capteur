@@ -250,7 +250,7 @@ function drawSchem(){
     comp(190,180,190,222,'R2'); gnd(190,222); dot(190,180); fb('R2');
   } else if(m==='comp'){
     src(40,180,'e1',cE1); ln(53,180,250,180); src(40,100,'Vref',mut); ln(53,100,250,100);
-    lab(fmt(S.Vref,'V'),150,92);
+    lab(fmt(S.Vref,'V'),150,92);run(); fitAll();
   } else if(m==='schm'){
     src(40,100,'e1',cE1); ln(53,100,210,100); ln(210,100,250,100);
     ln(250,180,150,180); comp(190,180,190,222,'R1'); gnd(190,222); dot(190,180);
@@ -271,7 +271,8 @@ function run(){
   $('l2').style.display = M[S.mode].two ? '' : 'none';
   sim(); infos(); draw();
 }
-run(); fitAll();
+['sch','xy','sc'].forEach(fit);
+run();
 </script>
 </body>
 </html>
