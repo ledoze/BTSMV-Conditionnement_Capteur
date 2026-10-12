@@ -1,278 +1,283 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Simulation de montages à amplificateur opérationnel</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
+<title>Simulateur GBF + oscilloscope 2 voies</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f5f7fa;--panel:#fff;--ink:#16202e;--mut:#5d6b7e;--grid:#dde3ec;--line:#c9d2df;--e1:#2f55d4;--e2:#128a7d;--vs:#d6336c;--bad:#c92a2a;
-box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151d;--panel:#18202c;--ink:#e8edf5;--mut:#93a1b5;--grid:#2a3444;--line:#3a4658;--e1:#7d98ff;--e2:#45d1bf;--vs:#ff7fa9;--bad:#ff8787}}
-:root[data-theme="dark"]{--bg:#10151d;--panel:#18202c;--ink:#e8edf5;--mut:#93a1b5;--grid:#2a3444;--line:#3a4658;--e1:#7d98ff;--e2:#45d1bf;--vs:#ff7fa9;--bad:#ff8787}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,sans-serif}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#e9e7e1;--panel:#f6f5f1;--ink:#1d2320;--muted:#667069;--line:#c9c6bb;--accent:#0f7a52;--on:#fff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15191a;--panel:#1f2527;--ink:#e4e9e5;--muted:#8d9a93;--line:#333c3f;--accent:#4fd69a;--on:#08140e}}
+:root[data-theme="dark"]{--bg:#15191a;--panel:#1f2527;--ink:#e4e9e5;--muted:#8d9a93;--line:#333c3f;--accent:#4fd69a;--on:#08140e}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 Barlow,system-ui,sans-serif}
 main{max-width:1100px;margin:0 auto;padding:16px}
-h1{font-size:1.3rem;margin:4px 0 12px}
-.top{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px 18px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;align-items:end}
-.top label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--mut)}
-.top b{color:var(--ink);font-weight:600}
-input[type=range],select{width:100%}
-select{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 10px;border-radius:8px;font:inherit}
-:focus-visible{outline:2px solid var(--vs);outline-offset:2px}
-.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:12px}
-.read div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:.82rem;color:var(--mut)}
-.read strong{display:block;font-size:1.05rem;color:var(--ink)}
-.grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:12px;margin-bottom:12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
-.card h2{font-size:.95rem;margin:2px 6px 4px;color:var(--mut);font-weight:600}
-.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:.85rem;margin:0 6px 4px}
-.leg i{display:inline-block;width:12px;height:3px;margin-right:5px;vertical-align:middle}
-canvas{display:block;width:100%}
-#sch,#xy{aspect-ratio:480/290}
-
-sc{height:340px}
-@media(max-width:760px){.grid{grid-template-columns:1fr}}
+h1{font-size:20px;margin:0 0 12px;font-weight:600}
+h2{font-size:15px;margin:0 0 10px;font-weight:600}
+.scope{background:#050a07;border:2px solid var(--line);border-radius:10px;padding:8px}
+canvas{display:block;width:100%;aspect-ratio:5/4;max-height:68vh;margin:0 auto;border-radius:4px;cursor:grab;touch-action:pan-y}
+.meas{display:flex;flex-wrap:wrap;gap:4px 22px;margin:10px 2px 2px;font:500 14px "JetBrains Mono",ui-monospace,monospace}
+.hint{color:var(--muted);font-size:13px;margin:0 2px 14px}
+.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.row{display:grid;grid-template-columns:100px 1fr 78px;align-items:center;gap:8px;margin:8px 0}
+.row label{color:var(--muted)}
+.row output{font:500 13px "JetBrains Mono",ui-monospace,monospace;text-align:right}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=number]{width:78px;font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--on);border-color:var(--accent)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sub{font-size:13px;color:var(--muted);margin:14px 0 2px;font-weight:600}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.toolbar button{font:inherit;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 12px;cursor:pointer}
+.toolbar button[aria-pressed=true]{background:var(--accent);color:var(--on);border-color:var(--accent)}
+.scope.paper{background:#fff;border-color:#999}
+.sch{width:100%;height:auto;color:var(--ink);display:block;margin:6px 0 10px}
+.sch text{fill:var(--ink);stroke:none}
+.sch .t{font:11px Barlow,sans-serif}.sch .b{font:600 13px Barlow,sans-serif}.sch .s{font:600 15px Barlow,sans-serif}
+@media print{body{background:#fff;color:#000}.toolbar,.hint,.panels{display:none}.scope{border:1px solid #000}}
 </style>
 </head>
 <body>
 <main>
-<h1>Montages à amplificateur opérationnel</h1>
-<div class="top" id="ctl">
-  <div><label>Montage</label><select id="mode"></select></div>
-  <div><label>Forme du signal e1</label><select id="wave"><option value="sin">Sinus</option><option value="tri">Triangle</option><option value="sq">Carré</option></select></div>
-</div>
-
-<div class="read">
-  <div>Relation entrée-sortie<strong id="r_rel"></strong></div>
-  <div>Caractéristique<strong id="r_gain"></strong></div>
-  <div>Gain mesuré (crête à crête)<strong id="r_meas"></strong></div>
-  <div>Tension de saturation ±Vsat<strong id="r_sat"></strong></div>
-  <div>État de la sortie<strong id="r_state"></strong></div>
-</div>
-
-<div class="grid">
-  <div class="card"><h2>Schéma du montage</h2><canvas id="sch"></canvas></div>
-  <div class="card"><h2>Caractéristique de transfert vs = f(e1)</h2><canvas id="xy"></canvas></div>
-</div>
-<div class="card"><h2>Oscilloscope : entrées et sortie (trois périodes de e1)</h2>
-  <div class="leg"><span><i style="background:var(--e1)"></i>e1</span><span id="l2"><i style="background:var(--e2)"></i>e2</span><span><i style="background:var(--vs)"></i>vs</span></div>
-  <canvas id="sc"></canvas></div>
+<h1>Générateurs BF, montages AOP et oscilloscope 3 voies</h1>
+<div class="toolbar"><button id="t0">CH1 actif</button><button id="t1">CH2 actif</button><button id="t2">CH3 actif</button><button id="tp">Écran fond blanc</button><button id="pr">Imprimer</button></div>
+<div class="scope"><canvas id="cv" width="1000" height="800"></canvas></div>
+<div class="meas" id="meas"></div>
+<p class="hint">Glisse sur l’écran pour déplacer la trace (horizontalement et verticalement), double-clic pour recentrer. En mode XY, CH1 est l’axe X et CH2 l’axe Y.</p>
+<div class="panels" id="panels"></div>
 </main>
 
 <script>
-const $ = id => document.getElementById(id);
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const FONT = '"IBM Plex Sans",sans-serif';
-const M = {
-  inv:  {n:'Amplificateur inverseur', s:['R1','R2']},
-  non:  {n:'Amplificateur non inverseur', s:['R1','R2']},
-  suiv: {n:'Suiveur', s:[]},
-  som:  {n:'Sommateur inverseur', s:['R1','R2','R3'], two:1},
-  diff: {n:'Amplificateur différentiel', s:['R1','R2'], two:1},
-  integ:{n:'Intégrateur', s:['R1','C']},
-  deriv:{n:'Dérivateur', s:['R2','C']},
-  comp: {n:'Comparateur (seuil Vref)', s:['Vref']},
-  schm: {n:'Trigger de Schmitt inverseur', s:['R1','R2']}
-};
-const P = [
-  {id:'R1',l:'R1',t:'log',min:100,max:1e6,v:1e4,u:'Ω'},
-  {id:'R2',l:'R2',t:'log',min:100,max:1e6,v:2.2e4,u:'Ω'},
-  {id:'R3',l:'R3',t:'log',min:100,max:1e6,v:1e4,u:'Ω'},
-  {id:'C',l:'C',t:'log',min:1e-9,max:1e-5,v:1e-7,u:'F'},
-  {id:'Vref',l:'Vref',t:'lin',min:-5,max:5,step:0.1,v:0,u:'V'},
-  {id:'vcc',l:'Alimentation ±Vcc',t:'lin',min:5,max:18,step:1,v:15,u:'V'},
-  {id:'f',l:'Fréquence de e1',t:'log',min:10,max:1e4,v:200,u:'Hz'},
-  {id:'A1',l:'Amplitude de e1',t:'lin',min:0,max:10,step:0.1,v:1,u:'V'},
-  {id:'off',l:'Composante continue de e1',t:'lin',min:-5,max:5,step:0.1,v:0,u:'V'},
-  {id:'f2',l:'Fréquence de e2',t:'log',min:10,max:1e4,v:1000,u:'Hz'},
-  {id:'A2',l:'Amplitude de e2',t:'lin',min:0,max:10,step:0.1,v:0.5,u:'V'}
-];
-const S = {mode:'inv', wave:'sin'};
-function fmt(x,u){
-  const a = Math.abs(x), p = [[1e6,'M'],[1e3,'k'],[1,''],[1e-3,'m'],[1e-6,'µ'],[1e-9,'n']];
-  if(a===0) return '0 '+u;
-  for(const [k,s] of p) if(a >= k*0.9999) return (x/k).toPrecision(3).replace(/\.?0+$/,'')+' '+s+u;
-  return x.toPrecision(3)+' '+u;
-}
-const nice = x => { const p = Math.pow(10, Math.floor(Math.log10(x))), m = x/p; return (m<=1?1:m<=2?2:m<=5?5:10)*p; };
+const $=id=>document.getElementById(id);
+const TD=[],VD=[5e-3,1e-2,2e-2,5e-2,.1,.2,.5,1,2,5,10];
+for(let e=-6;e<=-1;e++)for(const m of[1,2,5])TD.push(m*10**e);TD.push(1);
+const G=[{on:1,wave:'sine',f:1000,A:4,off:0,ph:0,duty:.5,noise:0},
+         {on:1,wave:'sine',f:1000,A:3,off:0,ph:90,duty:.5,noise:0},
+ {on:1,wave:'dc',f:1000,A:2,off:1,ph:0,duty:.5,noise:0}];
+const V=[{en:1,vdi:7,vpos:0,cpl:'DC',src:0},{en:1,vdi:7,vpos:0,cpl:'DC',src:1},{en:1,vdi:7,vpos:0,cpl:'DC',src:3}];
+const S={selG:0,selV:0,disp:'yt',tdi:TD.indexOf(1e-3),hpos:0,src:0,tcpl:'DC',slope:1,tmode:'auto',lvl:0,run:1,t0:null,trig:false,seed:0};
+const COL=['#2f9e6a','#3b8fd9','#c77dbd'];
+const PAL=[{bg:'#050a07',g:'#173125',ax:'#2f5a44',tk:'#3d7357',tx:'#d9e7df',c:['#5dffa8','#6fc4ff','#ff9ee0'],xy:'#d6ff7a',tr:'#ffd24a',dim:'#4b5a52',ar:'#04100a',ok:'#5dffa8',st:'#ff6b5e',gl:8},
+{bg:'#ffffff',g:'#d6d6d6',ax:'#8c8c8c',tk:'#6b6b6b',tx:'#111111',c:['#0b7a3e','#0a5fb4','#b0127a'],xy:'#4d6b00',tr:'#a85f00',dim:'#b5b5b5',ar:'#ffffff',ok:'#0b7a3e',st:'#c0261b',gl:0}];
+let P=PAL[0];
+S.paper=0;S.ysel=1;
+function tb(){[0,1,2].forEach(i=>$('t'+i).setAttribute('aria-pressed',!!V[i].en));$('tp').setAttribute('aria-pressed',!!S.paper);document.querySelector('.scope').classList.toggle('paper',!!S.paper);$('sch').innerHTML=schem()}
 
-/* ---------- Interface générée ---------- */
-Object.entries(M).forEach(([k,m]) => { const o = document.createElement('option'); o.value = k; o.textContent = m.n; $('mode').appendChild(o); });
-P.forEach(c => {
-  S[c.id] = c.v;
-  const d = document.createElement('div'); d.id = 'g_'+c.id;
-  d.innerHTML = '<label>'+c.l+' <b id="o_'+c.id+'"></b></label><input id="s_'+c.id+'" type="range" '+
-    (c.t==='log' ? 'min="0" max="1000" value="'+Math.round(1000*Math.log(c.v/c.min)/Math.log(c.max/c.min))+'"' :
-                   'min="'+c.min+'" max="'+c.max+'" step="'+c.step+'" value="'+c.v+'"')+'>';
-  $('ctl').appendChild(d);
-  $('s_'+c.id).oninput = e => { S[c.id] = c.t==='log' ? c.min*Math.pow(c.max/c.min, +e.target.value/1000) : +e.target.value; run(); };
-});
-$('mode').onchange = e => { S.mode = e.target.value; run(); };
-$('wave').onchange = e => { S.wave = e.target.value; run(); };
+const fmt=(v,u)=>{const a=Math.abs(v);
+ if(u==='s')return a<1e-3?+(v*1e6).toPrecision(3)+' µs':a<1?+(v*1e3).toPrecision(3)+' ms':+v.toPrecision(3)+' s';
+ if(u==='V')return a<1?+(v*1e3).toPrecision(3)+' mV':+v.toFixed(2)+' V';
+ return a>=1e3?+(v/1e3).toPrecision(4)+' kHz':+v.toPrecision(4)+' Hz'};
 
-/* ---------- Simulation temporelle (AOP idéal avec saturation) ---------- */
-const shape = {sin:p=>Math.sin(p), tri:p=>2/Math.PI*Math.asin(Math.sin(p)), sq:p=>Math.sin(p)>=0?1:-1};
-const E1 = t => S.off + S.A1*shape[S.wave](2*Math.PI*S.f*t);
-const E2 = t => S.A2*Math.sin(2*Math.PI*S.f2*t);
-let R = {};
-function sim(){
-  const N = 1500, T = 3/S.f, dt = T/N, vsat = S.vcc-1.5, clamp = x => Math.max(-vsat, Math.min(vsat, x));
-  const t = [], e1 = [], e2 = [], vs = []; let y = 0, hy = vsat, sat = false;
-  for(let i=0;i<=N;i++){
-    const tt = i*dt, a = E1(tt), b = E2(tt); let o = 0;
-    switch(S.mode){
-      case 'inv':  o = -S.R2/S.R1*a; break;
-      case 'non':  o = (1+S.R2/S.R1)*a; break;
-      case 'suiv': o = a; break;
-      case 'som':  o = -S.R2*(a/S.R1 + b/S.R3); break;
-      case 'diff': o = S.R2/S.R1*(b-a); break;
-      case 'integ': y = clamp(y - a/(S.R1*S.C)*dt); o = y; break;
-      case 'deriv': o = -S.R2*S.C*(a-E1(tt-dt))/dt; break;
-      case 'comp': o = a > S.Vref ? vsat : -vsat; break;
-      case 'schm': { const th = vsat*S.R1/(S.R1+S.R2);
-        if(hy>0 && a>th) hy = -vsat; else if(hy<0 && a<-th) hy = vsat; o = hy; break; }
-    }
-    if(Math.abs(o) > vsat) sat = true;
-    t.push(tt); e1.push(a); e2.push(b); vs.push(clamp(o));
-  }
-  R = {t, e1, e2, vs, T, vsat, sat};
-}
+/* ---- Interface générée ---- */
+const SPEC=[['Générateurs BF',[
+ ['seg','Source','s.selG',[[0,'GBF 1'],[1,'GBF 2'],[2,'DC']]],
+ ['seg','Sortie','g.on',[[1,'Marche'],[0,'Arrêt']]],
+ ['seg','Forme','g.wave',[['sine','Sinus'],['square','Carré'],['tri','Triangle'],['saw','Dent de scie'],['dc','Continu']]],
+ ['freq'],
+ ['rng','Amplitude','g.A',0,20,.1],['rng','Offset DC','g.off',-10,10,.1],
+ ['rng','Phase','g.ph',0,360,1],['rng','Rapp. cyclique','g.duty',.05,.95,.01],
+ ['rng','Bruit','g.noise',0,4,.05]]],
+['Oscilloscope',[
+ ['seg','Affichage','s.disp',[['yt','YT'],['xy','XY']]],
+ ['seg','Axe Y (XY)','s.ysel',[[1,'CH2'],[2,'CH3']]],
+ ['sub','Horizontal'],
+ ['rng','Base de temps','s.tdi',0,TD.length-1,1],['rng','Position H','s.hpos',-5,5,.05],
+ ['sub','Vertical'],
+ ['seg','Voie','s.selV',[[0,'CH1'],[1,'CH2'],[2,'CH3']]],
+ ['seg','Affichée','v.en',[[1,'Oui'],[0,'Non']]],
+ ['seg','Entrée','v.src',[[0,'GBF 1'],[1,'GBF 2'],[2,'DC'],[3,'Sortie AOP']]],
+ ['rng','Calibre','v.vdi',0,VD.length-1,1],['rng','Position V','v.vpos',-4,4,.05],
+ ['seg','Couplage','v.cpl',[['AC','AC'],['DC','DC'],['GND','GND']]]]],
+['Trigger',[
+ ['seg','Source','s.src',[[0,'CH1'],[1,'CH2'],[2,'CH3']]],
+ ['seg','Couplage','s.tcpl',[['AC','AC'],['DC','DC']]],
+ ['seg','Front','s.slope',[[1,'Montant'],[-1,'Descendant']]],
+ ['seg','Mode','s.tmode',[['auto','Auto'],['normal','Normal']]],
+ ['rng','Niveau','s.lvl',-4,4,.05],
+ ['seg','Acquisition','s.run',[[1,'Run'],[0,'Stop']]]]],
+['Montage AOP',[
+ ['seg','Montage','c.type',[['buf','Suiveur'],['inv','Inverseur'],['non','Non inverseur'],['sum','Sommateur'],['diff','Soustracteur'],['int','Intégrateur'],['der','Dérivateur'],['cmp','Comparateur']]],
+ ['sch'],
+ ['seg','Entrée e1','c.s1',[[0,'GBF 1'],[1,'GBF 2'],[2,'DC']]],
+ ['seg','Entrée e2','c.s2',[[0,'GBF 1'],[1,'GBF 2'],[2,'DC']]],
+ ['rng','R1','c.R1',1,100,.5],['rng','R2','c.R2',1,100,.5],['rng','R3','c.R3',1,100,.5],
+ ['rng','C','c.C',1,1000,1],['rng','Saturation','c.vsat',1,15,.5]]]];
+$('panels').innerHTML=SPEC.map(([t,items])=>`<section class="panel"><h2>${t}</h2>`+items.map(it=>{
+ if(it[0]==='sch')return'<div id="sch"></div>';
+ if(it[0]==='sub')return`<div class="sub">${it[1]}</div>`;
+ if(it[0]==='freq')return'<div class="row"><label>Fréquence</label><input type="range" id="fs" min="0" max="5" step="0.005"><input type="number" id="fn" min="1" max="100000" step="any"></div>';
+ const[k,l,p]=it;
+ if(k==='seg')return`<div class="row"><label>${l}</label><div class="seg" data-p="${p}" style="grid-column:2/4">${it[3].map(([v,x])=>`<button data-v="${v}">${x}</button>`).join('')}</div></div>`;
+ return`<div class="row"><label>${l}</label><input type="range" data-p="${p}" min="${it[3]}" max="${it[4]}" step="${it[5]}"><output></output></div>`}).join('')+'</section>').join('');
 
-function infos(){
-  const m = S.mode, q = S.R2/S.R1, vsat = R.vsat;
-  const txt = {
-    inv:['vs = −(R2/R1)·e1', 'G = '+(-q).toPrecision(3)],
-    non:['vs = (1 + R2/R1)·e1', 'G = '+(1+q).toPrecision(3)],
-    suiv:['vs = e1', 'G = 1 (Zin élevée, Zout faible)'],
-    som:['vs = −R2·(e1/R1 + e2/R3)', 'G1 = '+(-S.R2/S.R1).toPrecision(3)+' ; G2 = '+(-S.R2/S.R3).toPrecision(3)],
-    diff:['vs = (R2/R1)·(e2 − e1)', 'G = '+q.toPrecision(3)],
-    integ:['vs = −(1/R1C)·∫e1 dt', 'τ = R1·C = '+fmt(S.R1*S.C,'s')],
-    deriv:['vs = −R2·C·de1/dt', 'τ = R2·C = '+fmt(S.R2*S.C,'s')],
-    comp:['e1 > Vref → +Vsat, sinon −Vsat', 'seuil = '+fmt(S.Vref,'V')],
-    schm:['Basculement à ±Vsat·R1/(R1+R2)', 'seuils = ±'+fmt(vsat*S.R1/(S.R1+S.R2),'V')]
-  }[m];
-  $('r_rel').textContent = txt[0]; $('r_gain').textContent = txt[1];
-  let meas = '—';
-  if(['inv','non','suiv'].includes(m) && !R.sat){
-    const pp = a => Math.max(...a)-Math.min(...a); if(pp(R.e1) > 1e-9) meas = (pp(R.vs)/pp(R.e1)*(m==='inv'?-1:1)).toPrecision(3);
-  }
-  $('r_meas').textContent = meas;
-  $('r_sat').textContent = '±'+fmt(vsat,'V');
-  const st = $('r_state'); st.textContent = R.sat ? 'Saturation' : 'Régime linéaire';
-  st.style.color = R.sat ? css('--bad') : css('--ink');
-}
+const ref=p=>{const[k,n]=p.split('.');return[k==='g'?G[S.selG]:k==='v'?V[S.selV]:k==='c'?C:S,n]};
+const get=p=>{const[o,n]=ref(p);return o[n]};
+const set=(p,v)=>{const[o,n]=ref(p);o[n]=v};
+const lvlV=()=>S.lvl*VD[V[S.src].vdi];
+const OUT={A:v=>v.toFixed(1)+' Vpp',off:v=>v.toFixed(1)+' V',ph:v=>Math.round(v)+'°',duty:v=>Math.round(v*100)+' %',
+ noise:v=>v.toFixed(2)+' Vpp',tdi:v=>fmt(TD[v],'s'),vdi:v=>fmt(VD[v],'V'),hpos:v=>v.toFixed(2)+' div',
+ vpos:v=>v.toFixed(2)+' div',lvl:()=>fmt(lvlV(),'V'),R1:v=>v+' kΩ',R2:v=>v+' kΩ',R3:v=>v+' kΩ',C:v=>v+' nF',vsat:v=>'±'+v+' V'};
 
-/* ---------- Canvas ---------- */
-const cv = {};
-function fit(id){
-  const c = $(id), r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
-  c.width = r.width*d; c.height = r.height*d;
-  const g = c.getContext('2d'); g.setTransform(d,0,0,d,0,0); cv[id] = {g, w:r.width, h:r.height};
-}
-const fitAll = () => { ['sch','xy','sc'].forEach(fit); draw(); };
-addEventListener('resize', fitAll);
+function sync(){tb();
+ document.querySelectorAll('[data-p]').forEach(el=>{const p=el.dataset.p;
+  if(el.classList.contains('seg'))el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(get(p))===b.dataset.v));
+  else{el.value=get(p);el.nextElementSibling.textContent=OUT[p.split('.')[1]](+get(p))}});
+ const f=G[S.selG].f;$('fs').value=Math.log10(f);
+ if(document.activeElement!==$('fn'))$('fn').value=+f.toPrecision(5);
+ $('meas').innerHTML=G.map((g,i)=>g.on?`<div style="color:${COL[i]}">${['GBF 1','GBF 2','DC'][i]} : ${g.wave==='dc'?fmt(g.off,'V'):fmt(g.A,'V')+'pp, '+fmt(g.f,'Hz')+', T = '+fmt(1/g.f,'s')}</div>`:'').join('')+
+  (G[0].on&&G[1].on&&G[0].f===G[1].f?`<div>Déphasage : ${(G[1].ph-G[0].ph+360)%360}°</div>`:'')+`<div>Montage : ${form()}</div>`;}
+document.addEventListener('input',e=>{const el=e.target,p=el.dataset.p;
+ if(p){set(p,+el.value);sync()}
+ else if(el.id==='fs'){G[S.selG].f=10**+el.value;sync()}
+ else if(el.id==='fn'){const v=parseFloat(el.value);if(v>=1&&v<=1e5){G[S.selG].f=v;sync()}}});
+document.addEventListener('click',e=>{const b=e.target.closest('.seg button');if(!b)return;
+ const v=b.dataset.v;set(b.parentNode.dataset.p,isNaN(+v)?v:+v);sync()});
+$('fn').addEventListener('blur',sync);
 
-function drawScope(){
-  const {g,w,h} = cv.sc, grid = css('--grid'), mut = css('--mut');
-  g.clearRect(0,0,w,h);
-  const L = 56, Rm = 12, T = 12, B = 28, pw = w-L-Rm, ph = h-T-B;
-  const mx = Math.max(0.1, ...R.e1.map(Math.abs), ...R.vs.map(Math.abs), ...(M[S.mode].two ? R.e2.map(Math.abs) : [0]));
-  const ya = nice(mx*1.1), X = t => L + t/R.T*pw, Y = v => T + (1 - (v+ya)/(2*ya))*ph;
-  g.font = '12px '+FONT; g.lineWidth = 1; g.textAlign = 'right';
-  [-1,-0.5,0,0.5,1].forEach(a => { g.strokeStyle = grid; g.beginPath(); g.moveTo(L,Y(a*ya)); g.lineTo(L+pw,Y(a*ya)); g.stroke(); g.fillStyle = mut; g.fillText(fmt(a*ya,'V'), L-6, Y(a*ya)+4); });
-  g.textAlign = 'center';
-  for(let k=0;k<=3;k++){ g.strokeStyle = grid; g.beginPath(); g.moveTo(X(k*R.T/3),T); g.lineTo(X(k*R.T/3),T+ph); g.stroke(); g.fillStyle = mut; g.fillText(fmt(k*R.T/3,'s'), X(k*R.T/3), h-8); }
-  g.setLineDash([5,4]); g.strokeStyle = css('--bad'); g.globalAlpha = 0.6;
-  if(R.vsat < ya) [R.vsat,-R.vsat].forEach(v => { g.beginPath(); g.moveTo(L,Y(v)); g.lineTo(L+pw,Y(v)); g.stroke(); });
-  g.setLineDash([]); g.globalAlpha = 1;
-  const trace = (a,c,lw) => { g.strokeStyle = c; g.lineWidth = lw; g.beginPath(); a.forEach((v,i)=> i?g.lineTo(X(R.t[i]),Y(v)):g.moveTo(X(R.t[i]),Y(v))); g.stroke(); };
-  trace(R.e1, css('--e1'), 2);
-  if(M[S.mode].two) trace(R.e2, css('--e2'), 2);
-  trace(R.vs, css('--vs'), 2.6);
-}
+/* ---- Générateurs ---- */
+function wave(g,ph){const x=((ph%1)+1)%1;
+ switch(g.wave){case'square':return x<g.duty?1:-1;
+ case'tri':return x<g.duty?-1+2*x/g.duty:1-2*(x-g.duty)/(1-g.duty);
+ case'saw':return 2*x-1;case'dc':return 0;default:return Math.sin(2*Math.PI*x)}}
+const nz=(t,i)=>{const n=Math.sin(t*91731.137+S.seed*78.233+i*12.9898)*43758.5453;return(n-Math.floor(n))*2-1};
+const mean=i=>{const g=G[i];return g.on?g.off+(g.wave==='square'?g.A/2*(2*g.duty-1):0):0};
+const gen=(i,t)=>{const g=G[i];return g.on?g.off+g.A/2*wave(g,g.f*t+g.ph/360)+(g.noise?g.noise/2*nz(t,i):0):0};
 
-function drawXY(){
-  const {g,w,h} = cv.xy, grid = css('--grid'), mut = css('--mut');
-  g.clearRect(0,0,w,h);
-  const s = Math.min(w,h)-40, x0 = (w-s)/2, y0 = 14;
-  const mx = Math.max(0.1, ...R.e1.map(Math.abs), ...R.vs.map(Math.abs)), ya = nice(mx*1.1);
-  const X = v => x0 + (v+ya)/(2*ya)*s, Y = v => y0 + (1-(v+ya)/(2*ya))*s;
-  g.lineWidth = 1; g.strokeStyle = grid; g.strokeRect(x0,y0,s,s);
-  g.beginPath(); g.moveTo(X(0),y0); g.lineTo(X(0),y0+s); g.moveTo(x0,Y(0)); g.lineTo(x0+s,Y(0)); g.stroke();
-  g.fillStyle = mut; g.font = '12px '+FONT; g.textAlign = 'center';
-  g.fillText('e1 : ±'+fmt(ya,'V'), w/2, y0+s+16); g.textAlign = 'left'; g.fillText('vs', x0+4, y0+12);
-  g.strokeStyle = css('--vs'); g.lineWidth = 2; g.beginPath();
-  R.e1.forEach((a,i) => i ? g.lineTo(X(a),Y(R.vs[i])) : g.moveTo(X(a),Y(R.vs[i]))); g.stroke();
-}
+/* ---- Montages AOP (amplificateur idéal, sortie saturée à ±Vsat) ---- */
+const SRC=['GBF 1','GBF 2','DC','Sortie AOP'];
+const C={type:'inv',s1:0,s2:1,R1:10,R2:20,R3:10,C:100,vsat:13.5};
+const two=()=>['sum','diff','cmp'].includes(C.type);
+const acSrc=g=>g.on&&g.wave!=='dc'&&g.A>0&&g.f>0;
+function Tref(){let T=0;for(const k of two()?[C.s1,C.s2]:[C.s1])if(acSrc(G[k]))T=Math.max(T,1/G[k].f);return T||1e-3}
+const periodOf=k=>k===3?Tref():acSrc(G[k])?1/G[k].f:null;
+let tab=null,tabKey='';
+function table(){const g=G[C.s1],key=JSON.stringify([g.wave,g.A,g.duty]);
+ if(key!==tabKey){tabKey=key;const n=2048,a=new Float64Array(n);let m=0;
+  for(let k=0;k<n;k++){a[k]=g.A/2*wave(g,k/n);m+=a[k]}m/=n;
+  tab=new Float64Array(n);let s=0,mt=0;for(let k=0;k<n;k++){tab[k]=s;mt+=s;s+=(a[k]-m)/n}
+  mt/=n;for(let k=0;k<n;k++)tab[k]-=mt}
+ return tab}
+function aop(t){const e1=gen(C.s1,t),e2=gen(C.s2,t),{R1,R2,R3,vsat}=C;let s=0;
+ switch(C.type){case'buf':s=e1;break;case'inv':s=-R2/R1*e1;break;case'non':s=(1+R2/R1)*e1;break;
+ case'sum':s=-R2*(e1/R1+e2/R3);break;case'diff':s=R2/R1*(e2-e1);break;case'cmp':s=e1>e2?vsat:-vsat;break;
+ case'int':{const g=G[C.s1],m=mean(C.s1);
+  if(Math.abs(m)>1e-3)s=-Math.sign(m)*vsat;
+  else if(acSrc(g)){const T_=table(),n=T_.length,x=(((g.f*t+g.ph/360)%1)+1)%1*n,i=Math.floor(x),fr=x-i;
+   s=-(T_[i]*(1-fr)+T_[(i+1)%n]*fr)/g.f/(R1*C.C*1e-6)}
+  break}
+ case'der':{const g=G[C.s1];if(acSrc(g)){const h=1/g.f/400,d=g.A/2*(wave(g,g.f*(t+h/2)+g.ph/360)-wave(g,g.f*(t-h/2)+g.ph/360))/h;s=-R2*C.C*1e-6*d}break}}
+ return Math.max(-vsat,Math.min(vsat,s))}
+const node=(k,t)=>k<3?gen(k,t):aop(t);
+let omK='',om=0;
+function meanNode(k){if(k<3)return mean(k);
+ const key=JSON.stringify([G,C]);
+ if(key!==omK){omK=key;const T=Tref()*20,N=2000;let s=0;for(let j=0;j<N;j++)s+=aop((j+.5)/N*T);om=s/N}
+ return om}
+const form=()=>({buf:'s = e1',inv:`s = −(R2/R1)·e1 = −${(C.R2/C.R1).toFixed(2)}·e1`,non:`s = (1+R2/R1)·e1 = ${(1+C.R2/C.R1).toFixed(2)}·e1`,
+ sum:'s = −R2·(e1/R1 + e2/R3)',diff:'s = (R2/R1)·(e2 − e1)',
+ int:`s = −(1/R1C)·∫e1 dt, R1C = ${+(C.R1*C.C).toPrecision(3)} µs (sature si e1 a une composante continue)`,
+ der:`s = −R2C·de1/dt, R2C = ${+(C.R2*C.C).toPrecision(3)} µs`,cmp:'s = +Vsat si e1 > e2, sinon −Vsat'}[C.type])+` (e1 : ${SRC[C.s1]}${two()?', e2 : '+SRC[C.s2]:''})`;
 
-function drawSchem(){
-  const {g,w,h} = cv.sch, ink = css('--ink'), mut = css('--mut'), cE1 = css('--e1'), cE2 = css('--e2'), cVs = css('--vs');
-  g.clearRect(0,0,w,h); g.save(); g.scale(w/480, w/480);
-  g.strokeStyle = g.fillStyle = ink; g.lineWidth = 2; g.font = '600 12px '+FONT; g.lineJoin = 'round';
-  const ln = (...p) => { g.beginPath(); g.moveTo(p[0],p[1]); for(let i=2;i<p.length;i+=2) g.lineTo(p[i],p[i+1]); g.stroke(); };
-  const dot = (x,y) => { g.beginPath(); g.arc(x,y,3,0,7); g.fill(); };
-  const gnd = (x,y) => { ln(x,y,x,y+6); ln(x-10,y+6,x+10,y+6); ln(x-6,y+10,x+6,y+10); ln(x-2,y+14,x+2,y+14); };
-  const lab = (t,x,y,al,c) => { g.fillStyle = c||ink; g.textAlign = al||'center'; g.fillText(t,x,y); g.fillStyle = ink; };
-  const val = k => k==='C' ? fmt(S.C,'F') : fmt(S[k],'Ω');
-  const comp = (x1,y1,x2,y2,k,name,cap) => {
-    const hz = y1===y2, cx = (x1+x2)/2, cy = (y1+y2)/2, hl = 17;
-    if(cap){ if(hz){ ln(x1,y1,cx-4,y1); ln(cx+4,y1,x2,y2); ln(cx-4,cy-12,cx-4,cy+12); ln(cx+4,cy-12,cx+4,cy+12); } }
-    else if(hz){ ln(x1,y1,cx-hl,y1); ln(cx+hl,y1,x2,y2); g.strokeRect(cx-hl,cy-6,2*hl,12); }
-    else { ln(x1,y1,x1,cy-hl); ln(x1,cy+hl,x2,y2); g.strokeRect(x1-6,cy-hl,12,2*hl); }
-    if(hz) lab((name||k)+' '+val(k), cx, cy-(cap?18:12)); else lab((name||k)+' '+val(k), x1+12, cy+4, 'left');
-  };
-  const src = (x,y,t,c) => { g.strokeStyle = c; g.beginPath(); g.arc(x,y,13,0,7); g.stroke(); g.strokeStyle = ink;
-    lab('~',x,y+4,'center',c); lab(t,x,y-20,'center',c); };
-  const fb = (k,cap) => { ln(390,140,390,45,310,45); comp(310,45,230,45,k,k,cap); ln(230,45,210,45,210,100); dot(210,100); dot(390,140); };
-  // amplificateur
-  g.beginPath(); g.moveTo(250,78); g.lineTo(250,202); g.lineTo(350,140); g.closePath(); g.stroke();
-  lab('−',262,105,'left'); lab('+',262,188,'left');
-  ln(350,140,430,140); lab('vs',452,144,'center',cVs);
-  ln(210,100,250,100);
-  const m = S.mode;
-  if(m==='inv' || m==='integ' || m==='deriv'){
-    src(40,100,'e1',cE1); ln(53,100,80,100);
-    if(m==='deriv') comp(80,100,160,100,'C','C',1); else comp(80,100,160,100,'R1');
-    ln(160,100,250,100); ln(250,180,215,180); gnd(215,180);
-    if(m==='integ') fb('C',1); else fb('R2');
-  } else if(m==='non'){
-    src(40,180,'e1',cE1); ln(53,180,250,180); comp(210,100,210,140,'R1'); gnd(210,140); fb('R2');
-  } else if(m==='suiv'){
-    src(40,180,'e1',cE1); ln(53,180,250,180); ln(250,100,210,100,210,45,390,45,390,140); dot(210,100); dot(390,140);
-  } else if(m==='som'){
-    src(40,100,'e1',cE1); ln(53,100,80,100); comp(80,100,140,100,'R1');
-    src(40,180,'e2',cE2); ln(53,180,70,180); comp(70,180,130,180,'R3'); ln(130,180,160,180,160,100); dot(160,100);
-    ln(250,180,215,180); gnd(215,180); fb('R2');
-  } else if(m==='diff'){
-    src(40,100,'e1',cE1); ln(53,100,80,100); comp(80,100,140,100,'R1'); 
-    src(40,180,'e2',cE2); ln(53,180,80,180); comp(80,180,140,180,'R1','R1'); ln(140,180,250,180);
-    comp(190,180,190,222,'R2'); gnd(190,222); dot(190,180); fb('R2');
-  } else if(m==='comp'){
-    src(40,180,'e1',cE1); ln(53,180,250,180); src(40,100,'Vref',mut); ln(53,100,250,100);
-    lab(fmt(S.Vref,'V'),150,92);run(); fitAll();
-  } else if(m==='schm'){
-    src(40,100,'e1',cE1); ln(53,100,210,100); ln(210,100,250,100);
-    ln(250,180,150,180); comp(190,180,190,222,'R1'); gnd(190,222); dot(190,180);
-    ln(390,140,390,262,310,262); comp(310,262,230,262,'R2'); ln(230,262,150,262,150,180); dot(390,140);
-  }
-  g.restore();
-}
+/* ---- Schémas ---- */
+const W=(...p)=>`<path d="M${p.join(' L')}"/>`;
+const RES=(x,y,l)=>`<path d="M${x},${y} h10"/><rect x="${x+10}" y="${y-6}" width="30" height="12"/><path d="M${x+40},${y} h10"/><text x="${x+25}" y="${y-10}" class="t" text-anchor="middle">${l}</text>`;
+const CAP=(x,y,l)=>`<path d="M${x},${y} h22 M${x+22},${y-10} v20 M${x+28},${y-10} v20 M${x+28},${y} h22"/><text x="${x+25}" y="${y-14}" class="t" text-anchor="middle">${l}</text>`;
+const RESV=(x,y,l)=>`<g transform="translate(${x},${y}) rotate(90)"><path d="M0,0 h10"/><rect x="10" y="-6" width="30" height="12"/><path d="M40,0 h10"/></g><text x="${x+10}" y="${y+30}" class="t">${l}</text>`;
+const GND=(x,y)=>`<path d="M${x},${y} v8 M${x-9},${y+8} h18 M${x-6},${y+12} h12 M${x-3},${y+16} h6"/>`;
+const DOT=(x,y)=>`<circle cx="${x}" cy="${y}" r="3" style="fill:currentColor;stroke:none"/>`;
+const OP=f=>`<path d="M170,35 L170,135 L260,85 Z"/><text x="176" y="64" class="s">${f?'+':'−'}</text><text x="176" y="114" class="s">${f?'−':'+'}</text>`;
+const IN=(y,n,k)=>`<text x="4" y="${y-8}" class="b" style="fill:${COL[k]}">${n}</text><text x="4" y="${y+16}" class="t" style="fill:${COL[k]}">${SRC[k]}</text>`;
+function schem(){const r=n=>`${n}=${C[n]}k`,cc=`C=${C.C}n`;
+ const fbTop=el=>W('124,60','124,20','134,20')+el+W('184,20','290,20','290,85');
+ const front=l=>IN(60,'e1',C.s1)+W('4,60','44,60')+l+W('94,60','170,60')+DOT(124,60);
+ const gndP=W('170,110','140,110')+GND(140,110);
+ const B={
+  buf:()=>OP(1)+IN(60,'e1',C.s1)+W('4,60','170,60')+W('290,85','290,150','140,150','140,110','170,110'),
+  inv:()=>OP(0)+front(RES(44,60,r('R1')))+fbTop(RES(134,20,r('R2')))+gndP,
+  non:()=>OP(1)+IN(60,'e1',C.s1)+W('4,60','170,60')+W('170,110','94,110')+DOT(124,110)+RES(44,110,r('R1'))+W('44,110','34,110')+GND(34,110)+W('124,110','124,150','134,150')+RES(134,150,r('R2'))+W('184,150','290,150','290,85'),
+  sum:()=>OP(0)+IN(30,'e1',C.s1)+W('4,30','44,30')+RES(44,30,r('R1'))+W('94,30','124,30','124,60')+DOT(124,30)+IN(60,'e2',C.s2)+W('4,60','44,60')+RES(44,60,r('R3'))+W('94,60','170,60')+DOT(124,60)+W('124,30','124,6','134,6')+RES(134,6,r('R2'))+W('184,6','290,6','290,85')+gndP,
+  diff:()=>OP(0)+front(RES(44,60,r('R1')))+IN(110,'e2',C.s2)+W('4,110','44,110')+RES(44,110,r('R1'))+W('94,110','170,110')+DOT(124,110)+RESV(124,110,r('R2'))+GND(124,160)+fbTop(RES(134,20,r('R2'))),
+  int:()=>OP(0)+front(RES(44,60,r('R1')))+fbTop(CAP(134,20,cc))+gndP,
+  der:()=>OP(0)+front(CAP(44,60,cc))+fbTop(RES(134,20,r('R2')))+gndP,
+  cmp:()=>OP(1)+IN(60,'e1',C.s1)+W('4,60','170,60')+IN(110,'e2',C.s2)+W('4,110','170,110')};
+ return`<svg class="sch" viewBox="0 -14 350 190" role="img" aria-label="Schéma du montage"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">${B[C.type]()}${W('260,85','320,85')}${C.type==='cmp'?'':DOT(290,85)}</g><text x="326" y="90" class="b" style="fill:var(--accent)">s</text></svg>`}
 
-function draw(){ drawSchem(); drawXY(); drawScope(); }
+/* ---- Oscilloscope ---- */
+const chan=(i,t)=>{const c=V[i].cpl,k=V[i].src;return c==='GND'?0:c==='AC'?node(k,t)-meanNode(k):node(k,t)};
+const trigSig=t=>{const k=V[S.src].src;return node(k,t)-(S.tcpl==='AC'?meanNode(k):0)};
+function findTrigger(){
+ const T=periodOf(V[S.src].src);if(!T)return null;
+ const L=lvlV(),N=4000,dt=1.5*T/N;let p=trigSig(0);
+ for(let i=1;i<=N;i++){const t=i*dt,c=trigSig(t);
+  if(S.slope>0?(p<L&&c>=L):(p>L&&c<=L))return t-dt+dt*(L-p)/(c-p);
+  p=c}
+ return null}
 
-/* ---------- Mise à jour ---------- */
-function run(){
-  P.forEach(c => {
-    const vis = ['f','A1','off','vcc'].includes(c.id) || M[S.mode].s.includes(c.id) || (M[S.mode].two && ['f2','A2'].includes(c.id));
-    $('g_'+c.id).hidden = !vis;
-    $('o_'+c.id).textContent = fmt(S[c.id], c.u);
-  });
-  $('l2').style.display = M[S.mode].two ? '' : 'none';
-  sim(); infos(); draw();
-}
-run(); fitAll();
-run();
+const cv=$('cv'),ctx=cv.getContext('2d');
+function resize(){const d=Math.min(devicePixelRatio||1,2);cv.width=1000*d;cv.height=800*d;ctx.setTransform(d,0,0,d,0,0)}
+function arrow(x,y,dir,txt,col){ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-dir*14,y-8);ctx.lineTo(x-dir*14,y+8);ctx.closePath();ctx.fill();
+ ctx.fillStyle=P.ar;ctx.font='600 11px sans-serif';ctx.textAlign='center';ctx.fillText(txt,x-dir*8,y+4)}
+const clampY=y=>Math.max(10,Math.min(790,y));
+
+function draw(now){
+ const W=1000,H=800,xy=S.disp==='xy',td=TD[S.tdi];
+ if(S.run){S.seed=Math.random()*1000;
+  if(xy){S.t0=0}else{const t=findTrigger();
+   if(t!==null){S.t0=t;S.trig=true}else{S.trig=false;if(S.tmode==='auto')S.t0=now/1000}}}
+ P=PAL[S.paper?1:0];ctx.fillStyle=P.bg;ctx.fillRect(0,0,W,H);
+ ctx.lineWidth=1;
+ for(let i=0;i<=10;i++){ctx.strokeStyle=i===5?P.ax:P.g;ctx.beginPath();ctx.moveTo(i*100,0);ctx.lineTo(i*100,H);ctx.stroke()}
+ for(let j=0;j<=8;j++){ctx.strokeStyle=j===4?P.ax:P.g;ctx.beginPath();ctx.moveTo(0,j*100);ctx.lineTo(W,j*100);ctx.stroke()}
+ ctx.strokeStyle=P.tk;ctx.beginPath();
+ for(let i=0;i<=50;i++){ctx.moveTo(i*20,394);ctx.lineTo(i*20,406)}
+ for(let j=0;j<=40;j++){ctx.moveTo(494,j*20);ctx.lineTo(506,j*20)}ctx.stroke();
+ ctx.save();ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
+ ctx.lineWidth=2.2;ctx.shadowBlur=P.gl;ctx.lineJoin='round';
+ if(xy){
+  if(V[0].en&&V[S.ysel].en){
+   const Y=V[S.ysel],v0=VD[V[0].vdi],v1=VD[Y.vdi],span=20*Math.max(periodOf(V[0].src)||1e-3,periodOf(Y.src)||1e-3),N=4000;
+   ctx.strokeStyle=P.xy;ctx.shadowColor=P.xy;ctx.beginPath();
+   for(let k=0;k<=N;k++){const t=k/N*span,x=500+(chan(0,t)/v0+S.hpos)*100,y=400-(chan(S.ysel,t)/v1+Y.vpos)*100;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}
+   ctx.stroke()}
+ }else if(S.t0!==null){
+  for(let i=0;i<3;i++){if(!V[i].en)continue;const vd=VD[V[i].vdi];
+   ctx.strokeStyle=P.c[i];ctx.shadowColor=P.c[i];ctx.beginPath();
+   for(let px=0;px<=W;px++){const t=S.t0+(px/100-5-S.hpos)*td,y=400-(chan(i,t)/vd+V[i].vpos)*100;px?ctx.lineTo(px,y):ctx.moveTo(px,y)}
+   ctx.stroke()}}
+ ctx.restore();
+ if(!xy){
+  for(let i=0;i<3;i++)if(V[i].en)arrow(0,clampY(400-V[i].vpos*100),-1,i+1,P.c[i]);
+  arrow(W,clampY(400-(lvlV()/VD[V[S.src].vdi]+V[S.src].vpos)*100),1,'T',P.tr);
+  const hx=500+S.hpos*100;ctx.fillStyle=P.tr;ctx.beginPath();ctx.moveTo(hx-6,0);ctx.lineTo(hx+6,0);ctx.lineTo(hx,10);ctx.fill()}
+ ctx.font='500 16px "JetBrains Mono",monospace';
+ for(let i=0;i<3;i++){ctx.textAlign='left';ctx.fillStyle=V[i].en?P.c[i]:P.dim;
+  ctx.fillText('CH'+(i+1)+(xy?(i===0?' (X) ':i===S.ysel?' (Y) ':'  '):'  ')+fmt(VD[V[i].vdi],'V')+'/div  '+V[i].cpl+'  '+SRC[V[i].src],14,H-66+i*26)}
+ ctx.textAlign='center';ctx.fillStyle=P.tx;ctx.fillText(xy?'Mode XY':fmt(td,'s')+'/div',W/2,H-14);
+ ctx.textAlign='right';
+ if(!xy){ctx.fillStyle=P.tr;ctx.fillText('Trig CH'+(S.src+1)+' '+S.tcpl+(S.slope>0?' ↑ ':' ↓ ')+fmt(lvlV(),'V'),W-14,H-14);
+  const st=!S.run?'STOP':S.trig?"TRIG'D":S.tmode==='auto'?'AUTO':'ATTENTE';
+  ctx.fillStyle=st==="TRIG'D"?P.ok:st==='STOP'?P.st:P.tr;ctx.fillText(st,W-14,28)}
+ requestAnimationFrame(draw)}
+
+/* Déplacement de la trace à la souris / au doigt */
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(!drag)return;
+ const k=1000/cv.getBoundingClientRect().width/100,cl=(v,m)=>Math.max(-m,Math.min(m,v)),v=S.disp==='xy'?V[S.ysel]:V[S.selV];
+ S.hpos=cl(S.hpos+(e.clientX-drag.x)*k,5);v.vpos=cl(v.vpos-(e.clientY-drag.y)*k,4);
+ drag={x:e.clientX,y:e.clientY};sync()});
+['pointerup','pointercancel'].forEach(n=>cv.addEventListener(n,()=>drag=null));
+cv.addEventListener('dblclick',()=>{S.hpos=0;(S.disp==='xy'?V[S.ysel]:V[S.selV]).vpos=0;sync()});
+
+[0,1,2].forEach(i=>$('t'+i).onclick=()=>{V[i].en=V[i].en?0:1;sync()});
+$('tp').onclick=()=>{S.paper=S.paper?0:1;sync()};
+$('pr').onclick=()=>{const p=S.paper;S.paper=1;sync();setTimeout(()=>{try{print()}catch(e){}S.paper=p;sync()},150)};
+sync();resize();addEventListener('resize',resize);requestAnimationFrame(draw);
 </script>
 </body>
 </html>
